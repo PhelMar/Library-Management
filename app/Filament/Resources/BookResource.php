@@ -14,6 +14,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Storage;
 
@@ -53,13 +54,6 @@ class BookResource extends Resource
                     ->maxSize(5120)
                     ->image()
                     ->imageEditor()
-                    ->directory('books')
-                    ->preserveFilenames()
-                    ->enableOpen()
-                    ->enableDownload()
-                    ->reorderable()
-                    ->columnSpanFull()
-                    ->required(fn($livewire) => $livewire instanceof \Filament\Resources\Pages\CreateRecord)
                     ->validationMessages([
                         'minFiles' => 'Please upload at least 1 image.',
                         'maxFiles' => 'You can upload a maximum of 3 images.',
@@ -93,7 +87,9 @@ class BookResource extends Resource
 
             ])
             ->filters([
-                //
+                SelectFilter::make('course_id')
+                    ->label('Course')
+                    ->relationship('course', 'course_name')
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
@@ -119,28 +115,5 @@ class BookResource extends Resource
             'create' => Pages\CreateBook::route('/create'),
             'edit' => Pages\EditBook::route('/{record}/edit'),
         ];
-    }
-
-    public static function mutateFormDataBeforeFill(array $data): array
-    {
-        $data['img_book'] = collect($data['img_book'] ?? [])
-            ->filter(fn($path) => Storage::disk('public')->exists($path))
-            ->map(fn($path) => Storage::url($path)) // full public URL like /storage/books/file.jpg
-            ->values()
-            ->toArray();
-
-        return $data;
-    }
-
-    public static function mutateFormDataBeforeSave(array $data): array
-    {
-        $data['img_book'] = collect($data['img_book'] ?? [])
-            ->map(function ($item) {
-                // Strip URL back to relative path, e.g., books/Books_Python1.jpg
-                return str_replace('storage/', '', ltrim(parse_url($item, PHP_URL_PATH), '/'));
-            })
-            ->toArray();
-
-        return $data;
     }
 }

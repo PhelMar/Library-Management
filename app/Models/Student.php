@@ -20,4 +20,9 @@ class Student extends Model
     {
         return $this->hasMany(StudentRecord::class);
     }
+
+    public function getFullNameAttribute()
+    {
+        return "{$this->first_name} {$this->last_name}";
+    }
 }
