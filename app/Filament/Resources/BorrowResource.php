@@ -2,19 +2,20 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\StudentRecordResource\Pages;
+use App\Filament\Resources\BorrowResource\Pages;
+use App\Filament\Resources\BorrowResource\RelationManagers;
+use App\Models\Book;
+use App\Models\Borrow;
 use App\Models\StudentRecord;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
-class StudentRecordResource extends Resource
+class BorrowResource extends Resource
 {
-    protected static ?string $model = StudentRecord::class;
+    protected static ?string $model = Borrow::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
@@ -22,7 +23,7 @@ class StudentRecordResource extends Resource
     {
         return $form
             ->schema([
-                Select::make('student_id')
+                Select::make('student_records_id')
                     ->label('Student ID No')
                     ->searchable()
                     ->getSearchResultsUsing(function (?string $search) {
@@ -50,34 +51,31 @@ class StudentRecordResource extends Resource
                             : null;
                     })
                     ->required(),
-                Select::make('course_id')
-                    ->relationship('course', 'course_name')
-                    ->preload()
+                Select::make('book_id')
+                    ->label('Book Title')
                     ->searchable()
-                    ->required(),
-                Select::make('school_year_id')
-                    ->label('School Year')
-                    ->options(function () {
-                        return \App\Models\SchoolYear::latest()
-                            ->take(5)
-                            ->pluck('school_year_name', 'id');
+                    ->getSearchResultsUsing(function (?string $search) {
+                        return Book::query()
+                            ->when($search, function ($query, $search) {
+                                $query->where('title', 'like', "%{$search}%")
+                                    ->orWhere('author', 'like', "%{$search}%");
+                            }, function ($query) {
+                                $query->limit(5);
+                            })
+                            ->get()
+                            ->mapWithKeys(function ($book) {
+                                return [
+                                    $book->id = $book->title . ' - ' . $book->author,
+                                ];
+                            })
+                            ->toArray();
                     })
-                    ->default(function () {
-                        return \App\Models\SchoolYear::latest()->value('id');
+                    ->getOptionLabelUsing(function ($value): ?string {
+                        $book = Book::find($value);
+                        return $book ? $book->title . ' - ' . $book->author : null;
                     })
-                    ->disabled(fn($livewire) => $livewire instanceof \Filament\Resources\Pages\CreateRecord) // visually disabled
-                    ->dehydrated(fn($livewire) => true) // still submit value
                     ->required(),
 
-
-                Select::make('semester_id')
-                    ->relationship('semester', 'semester_name')
-                    ->preload()
-                    ->required(),
-                Select::make('year_level_id')
-                    ->relationship('year_level', 'year_level_name')
-                    ->preload()
-                    ->required(),
             ]);
     }
 
@@ -85,29 +83,10 @@ class StudentRecordResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('student.id_no')
-                    ->label('Student Id')
-                    ->searchable(),
-                TextColumn::make('student.full_name')
-                    ->label('Student Name')
-                    ->searchable(),
-                TextColumn::make('course.course_name')
-                    ->searchable(),
-                TextColumn::make('school_year.school_year_name')
-                    ->searchable(),
-                TextColumn::make('semester.semester_name')
-                    ->searchable(),
-                TextColumn::make('year_level.year_level_name')
-                    ->searchable(),
-
+                //
             ])
             ->filters([
-                SelectFilter::make('course_id')
-                    ->label('Course')
-                    ->relationship('course', 'course_name'),
-                SelectFilter::make('school_year_id')
-                    ->label('School Year')
-                    ->relationship('school_year', 'school_year_name')
+                //
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
@@ -129,9 +108,9 @@ class StudentRecordResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListStudentRecords::route('/'),
-            'create' => Pages\CreateStudentRecord::route('/create'),
-            'edit' => Pages\EditStudentRecord::route('/{record}/edit'),
+            'index' => Pages\ListBorrows::route('/'),
+            'create' => Pages\CreateBorrow::route('/create'),
+            'edit' => Pages\EditBorrow::route('/{record}/edit'),
         ];
     }
 }
