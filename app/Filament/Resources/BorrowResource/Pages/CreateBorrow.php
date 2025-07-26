@@ -9,4 +9,11 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateBorrow extends CreateRecord
 {
     protected static string $resource = BorrowResource::class;
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        $data['status'] = 'Borrowed';
+
+        return $data;
+    }
 }

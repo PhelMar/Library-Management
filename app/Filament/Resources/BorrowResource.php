@@ -3,15 +3,18 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\BorrowResource\Pages;
-use App\Filament\Resources\BorrowResource\RelationManagers;
 use App\Models\Book;
 use App\Models\Borrow;
 use App\Models\StudentRecord;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Support\Carbon;
 
 class BorrowResource extends Resource
 {
@@ -65,7 +68,7 @@ class BorrowResource extends Resource
                             ->get()
                             ->mapWithKeys(function ($book) {
                                 return [
-                                    $book->id = $book->title . ' - ' . $book->author,
+                                    $book->id => $book->title . ' - ' . $book->author,
                                 ];
                             })
                             ->toArray();
@@ -75,6 +78,22 @@ class BorrowResource extends Resource
                         return $book ? $book->title . ' - ' . $book->author : null;
                     })
                     ->required(),
+                DatePicker::make('due_date')
+                    ->label('Due Date')
+                    ->minDate(now())
+                    ->disabledDates(function () {
+                        $disabled = [];
+
+                        for ($i = 0; $i <= 7; $i++) {
+                            $date = Carbon::now()->addDays($i);
+                            if ($date->isSunday()) {
+                                $disabled[] = $date->toDateString();
+                            }
+                        }
+                        return $disabled;
+                    })
+                    ->maxDate(Carbon::now()->addDays(7))
+                    ->required(),
 
             ]);
     }
@@ -83,7 +102,24 @@ class BorrowResource extends Resource
     {
         return $table
             ->columns([
-                //
+                TextColumn::make('student_record.student.full_name')
+                    ->label('Student Name')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('book.title')
+                    ->label('Book Title')
+                    ->searchable(),
+                TextColumn::make('book.author')
+                    ->label('Author')
+                    ->searchable(),
+                TextColumn::make('borrowed_date')
+                    ->label('Borrowed Date'),
+                TextColumn::make('due_date')
+                    ->label('Due Date'),
+                TextColumn::make('returned_date')
+                    ->label('Returned Date'),
+                TextColumn::make('status')
+                    ->label('Status'),
             ])
             ->filters([
                 //
@@ -112,5 +148,11 @@ class BorrowResource extends Resource
             'create' => Pages\CreateBorrow::route('/create'),
             'edit' => Pages\EditBorrow::route('/{record}/edit'),
         ];
+    }
+
+    public static function getEloquentQuery(): EloquentBuilder
+    {
+        return parent::getEloquentQuery()
+            ->with(['student_record.student']);
     }
 }
