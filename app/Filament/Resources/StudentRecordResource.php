@@ -3,14 +3,20 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\StudentRecordResource\Pages;
+use App\Filament\Resources\StudentRecordResource\RelationManagers;
 use App\Models\StudentRecord;
+use Filament\Actions\SelectAction;
+use Filament\Forms;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class StudentRecordResource extends Resource
 {
@@ -23,32 +29,9 @@ class StudentRecordResource extends Resource
         return $form
             ->schema([
                 Select::make('student_id')
-                    ->label('Student ID No')
+                    ->relationship('student', 'id_no')
+                    ->preload()
                     ->searchable()
-                    ->getSearchResultsUsing(function (?string $search) {
-                        return StudentRecord::with('student')
-                            ->when($search, function ($query, $search) {
-                                $query->whereHas('student', function ($q) use ($search) {
-                                    $q->where('id_no', 'like', "%{$search}%")
-                                        ->orWhere('last_name', 'like', "%{$search}%");
-                                });
-                            }, function ($query) {
-                                $query->limit(5);
-                            })
-                            ->get()
-                            ->mapWithKeys(function ($record) {
-                                return [
-                                    $record->id => $record->student->id_no . ' - ' . $record->student->last_name . ', ' . $record->student->first_name,
-                                ];
-                            })
-                            ->toArray();
-                    })
-                    ->getOptionLabelUsing(function ($value): ?string {
-                        $record = StudentRecord::with('student')->find($value);
-                        return $record
-                            ? $record->student->id_no . ' - ' . $record->student->name
-                            : null;
-                    })
                     ->required(),
                 Select::make('course_id')
                     ->relationship('course', 'course_name')

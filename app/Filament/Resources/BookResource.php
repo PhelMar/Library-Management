@@ -47,6 +47,11 @@ class BookResource extends Resource
                     ->searchable()
                     ->preload()
                     ->required(),
+                TextInput::make('quantity')
+                    ->numeric()
+                    ->type('number')
+                    ->rule('integer')
+                    ->required(),
                 FileUpload::make('img_book')
                     ->label('Book Images')
                     ->multiple()
@@ -75,6 +80,8 @@ class BookResource extends Resource
                 TextColumn::make('year_published')
                     ->label('Year Published')
                     ->searchable(),
+                TextColumn::make('quantity')
+                    ->label('Quantity'),
                 ImageColumn::make('img_book')
                     ->label('Img Book')
                     ->disk('public')

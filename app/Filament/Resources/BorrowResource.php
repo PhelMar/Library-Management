@@ -9,6 +9,8 @@ use App\Models\StudentRecord;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
@@ -26,7 +28,7 @@ class BorrowResource extends Resource
     {
         return $form
             ->schema([
-                Select::make('student_records_id')
+                Select::make('student_record_id')
                     ->label('Student ID No')
                     ->searchable()
                     ->getSearchResultsUsing(function (?string $search) {
@@ -50,13 +52,49 @@ class BorrowResource extends Resource
                     ->getOptionLabelUsing(function ($value): ?string {
                         $record = StudentRecord::with('student')->find($value);
                         return $record
-                            ? $record->student->id_no . ' - ' . $record->student->name
+                            ? $record->student->id_no . ' - ' . $record->student->full_name
                             : null;
+                    })
+                    ->reactive()
+                    ->afterStateUpdated(function (Get $get, $state) {
+                        $activeBorrowCount = \App\Models\Borrow::where('student_record_id', $state)
+                            ->where('status', 'Borrowed')
+                            ->count();
+
+                        if ($activeBorrowCount >= 3) {
+                            Notification::make()
+                                ->title('Borrowing Limit Reached')
+                                ->body('This student has already borrowed 3 books and must return one before borrowing more.')
+                                ->danger()
+                                ->send();
+                        }
+                    })
+                    ->rule(function (Get $get) {
+                        return function (string $attribute, $value, $fail) {
+                            $borrowCount = \App\Models\Borrow::where('student_record_id', $value)
+                                ->where('status', 'Borrowed')
+                                ->count();
+
+                            if ($borrowCount >= 3) {
+                                $fail('This student has already borrowed the maximum of 3 books.');
+                            }
+                        };
+                    })
+                    ->hint(function (Get $get) {
+                        $id = $get('student_record_id');
+                        if (!$id) return null;
+
+                        $count = \App\Models\Borrow::where('student_record_id', $id)
+                            ->where('status', 'Borrowed')
+                            ->count();
+
+                        return "Currently borrowed: {$count}/3";
                     })
                     ->required(),
                 Select::make('book_id')
                     ->label('Book Title')
                     ->searchable()
+                    ->reactive()
                     ->getSearchResultsUsing(function (?string $search) {
                         return Book::query()
                             ->when($search, function ($query, $search) {
@@ -68,7 +106,7 @@ class BorrowResource extends Resource
                             ->get()
                             ->mapWithKeys(function ($book) {
                                 return [
-                                    $book->id => $book->title . ' - ' . $book->author,
+                                    $book->id => $book->title . ' - (' . $book->quantity . ' available)',
                                 ];
                             })
                             ->toArray();
@@ -76,6 +114,17 @@ class BorrowResource extends Resource
                     ->getOptionLabelUsing(function ($value): ?string {
                         $book = Book::find($value);
                         return $book ? $book->title . ' - ' . $book->author : null;
+                    })
+                    ->afterStateUpdated(function (Get $get, $state) {
+                        $book = \App\Models\Book::find($state);
+
+                        if ($book && $book->quantity <= 0) {
+                            Notification::make()
+                                ->title('Out of Stock')
+                                ->body('This book is currently not available for borrowing.')
+                                ->danger()
+                                ->send();
+                        }
                     })
                     ->required(),
                 DatePicker::make('due_date')
@@ -101,11 +150,15 @@ class BorrowResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function ($query) {
+                return $query->with('student_record.student');
+            })
             ->columns([
                 TextColumn::make('student_record.student.full_name')
                     ->label('Student Name')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->formatStateUsing(fn($state) => $state ?? 'N/A'),
                 TextColumn::make('book.title')
                     ->label('Book Title')
                     ->searchable(),
@@ -148,11 +201,5 @@ class BorrowResource extends Resource
             'create' => Pages\CreateBorrow::route('/create'),
             'edit' => Pages\EditBorrow::route('/{record}/edit'),
         ];
-    }
-
-    public static function getEloquentQuery(): EloquentBuilder
-    {
-        return parent::getEloquentQuery()
-            ->with(['student_record.student']);
     }
 }

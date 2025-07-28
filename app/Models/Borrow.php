@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Borrow extends Model
 {
     protected $fillable = [
-        'student_records_id',
+        'student_record_id',
         'book_id',
         'borrowed_date',
         'due_date',

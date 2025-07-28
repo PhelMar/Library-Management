@@ -3,7 +3,9 @@
 namespace App\Filament\Resources\BorrowResource\Pages;
 
 use App\Filament\Resources\BorrowResource;
+use App\Models\Book;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Support\Carbon;
 
@@ -21,13 +23,27 @@ class EditBorrow extends EditRecord
                 ->icon('heroicon-o-check-circle')
                 ->visible(fn($record) => $record->status !== 'Returned')
                 ->requiresConfirmation()
-                ->action(function () {
-                    $this->record->update([
+                ->action(function ($record) {
+                    $record->update([
                         'status' => 'Returned',
-                        'returned_date' => Carbon::now()->toDateString(),
+                        'returned_date' => now()->toDateString(),
                     ]);
-                    $this->notify('success', 'Book marked as returned.');
+
+                    $book = Book::find($record->book_id);
+                    if ($book) {
+                        $book->increment('quantity');
+                    }
+
+
+                    Notification::make()
+                        ->title('Book marked as returned.')
+                        ->success()
+                        ->send();
+                    return redirect(static::getResource()::getUrl('index'));
                 }),
+
+
+
         ];
     }
 }

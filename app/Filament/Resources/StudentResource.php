@@ -10,12 +10,16 @@ use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Validation\Rule;
 
 class StudentResource extends Resource
 {
@@ -32,7 +36,33 @@ class StudentResource extends Resource
                         TextInput::make('id_no')
                             ->label('Student ID No')
                             ->required()
-                            ->maxLength(10),
+                            ->numeric()
+                            ->type('number')
+                            ->maxLength(10)
+                            ->reactive()
+                            ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
+                                if (!$state) return;
+
+                                $exists = Student::where('id_no', $state)->exists();
+
+                                if ($exists) {
+                                    Notification::make()
+                                        ->title('ID number already exists')
+                                        ->danger()
+                                        ->send();
+
+                                    $set('id_no', null);
+                                }
+                            })
+                            ->rule(function () {
+                                return function (string $attribute, $value, $fail) {
+                                    $exists = \App\Models\Student::where('id_no', $value)->exists();
+                                    if ($exists) {
+                                        $fail('This ID number already exists.');
+                                    }
+                                };
+                            })
+                            ->required(),
                         TextInput::make('first_name')
                             ->label('First Name')
                             ->required()
@@ -51,8 +81,19 @@ class StudentResource extends Resource
                             ->label('Contact No')
                             ->numeric()
                             ->maxLength(11)
+                            ->minLength(11)
                             ->tel()
-                            ->required(),
+                            ->reactive()
+                            ->placeholder('09991350266')
+                            ->required()
+                            ->helperText('Enter an 11-digit mobile number starting with 09')
+                            ->rule(function (Get $get) {
+                                return function (string $attribute, $value, $fail) {
+                                    if (!preg_match('/^09\d{9}$/', $value)) {
+                                        $fail('The contact number must start with 09 and be 11 digits.');
+                                    }
+                                };
+                            }),
                         Textarea::make('address')
                             ->required()
                             ->label('Address')
